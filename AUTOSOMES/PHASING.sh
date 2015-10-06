@@ -1,7 +1,21 @@
-#! bin/sh
+#!/bin/bash
 
 for Inv in In055 In045 In340 In069 In266
 	do
+		#Get inversion chrm
+		INV_CHRM=`cat ./PRECOMPUTED/VCFs_and_BPs/${Inv}/BP.positions | sed 's/-/\t/g' | cut -f1`
+		if [[ "$INV_CHRM" =~ X ]]; then
+					
+			MERGE_SCRIPT="Merge_Xchrm.pl"
+			VCFtoBEAGLE_SCRIPT="VCFtoBEAGLE_Xchrm.pl"
+			VCFHap_SCRIPT="VCFhap_Xchrm.pl"
+		else
+			MERGE_SCRIPT="Merge.pl"
+			VCFtoBEAGLE_SCRIPT="VCFtoBEAGLE.pl"
+			VCFHap_SCRIPT="VCFhap.pl"
+			
+		fi
+
 		for population in LWK JPT CHB TSI CEU YRI 
 			do
 
@@ -17,9 +31,12 @@ for Inv in In055 In045 In340 In069 In266
 
 
 				echo Creating LIST for In = ${Inv} and POP = ${population}
+				
+					
+					
 				## Aqui pongo los individuos presentes en ambas listas (la lista de genotipados experimentalmente + lista de individuos del proyecto 1000 G) en formato likelihood para luego introducirlo en el VCF de los SNPs. Para cada poblacion por separado. Recordad que phaseamos todos los individuos de 1000 G, esten o no genotipados experimentalmente, pero al final elimino los individuos para los que se ha imputado la inversion y los individuos con switch errors.
 					
-					perl Merge.pl -genotyped_list ./PRECOMPUTED/VCFs_and_BPs/${Inv}/HapMap.Genotyped.List -1000G_list ./PRECOMPUTED/POPs_LIST/1000G.UnGenotyped.${population}.List -BPs_file ./PRECOMPUTED/VCFs_and_BPs/${Inv}/BP.positions -Population ${population} -Inv ${Inv}
+					perl $MERGE_SCRIPT -genotyped_list ./PRECOMPUTED/VCFs_and_BPs/${Inv}/HapMap.Genotyped.List -1000G_list ./PRECOMPUTED/POPs_LIST/1000G.UnGenotyped.${population}.List -BPs_file ./PRECOMPUTED/VCFs_and_BPs/${Inv}/BP.positions -Population ${population} -Inv ${Inv}
 					# Genera el output que encontrareis en: ./${Inv}/LISTS/${population}/${population}.BP.ALLPOP.list
 
 				echo Spliting VCF for In = ${Inv} and POP = ${population}
@@ -62,7 +79,7 @@ for Inv in In055 In045 In340 In069 In266
 				echo Creating Beagle Input for In = ${Inv} and POP = ${population}
 				## En este paso cambio de formato, de VCF a input del Beagle. 
 					
-					perl VCFtoBEAGLE.pl -vcf ./${Inv}/VCF/${population}/${population}.BP.vcf > ${population}.beagle.temp
+					perl $VCFtoBEAGLE_SCRIPT -vcf ./${Inv}/VCF/${population}/${population}.BP.vcf > ${population}.beagle.temp
 					sed 's/ //g' ${population}.beagle.temp | sed '/^$/d' | sed 's/ID/marker/g' | sed 's/REF/alleleA/g' | sed 's/ALT/alleleB/g' | 	sed 's/	1.0000	1.0000	1.0000//g' > ./${Inv}/BEAGLE/INPUT/${population}.beagle.inp
 				
 				rm ${population}.beagle.temp #delete temporary files
@@ -120,7 +137,8 @@ for Inv in In055 In045 In340 In069 In266
 							paste ./${Inv}/VCF/${population}/output4 ./${Inv}/VCF/${population}/rsoutput4	> ./${Inv}/VCF/${population}/output5						
 				
 							## Aqui estan todos los SNPs, sepamos o no el estado ancestral.
-							perl VCFhap.pl -file ./${Inv}/VCF/${population}/output5 | sed '/^$/d' | sed 's/\t\s/\t/g' | sed 's/\t\s/\t/g' > ./${Inv}/VCF/${population}/output6
+							
+							perl $VCFHap_SCRIPT -file ./${Inv}/VCF/${population}/output5 | sed '/^$/d' | sed 's/\t\s/\t/g' | sed 's/\t\s/\t/g' > ./${Inv}/VCF/${population}/output6
 							grep 'CHROM' ./${Inv}/VCF/${population}/output6 >  BPs
 							grep 'BP'    ./${Inv}/VCF/${population}/output6 >> BPs
 							perl Transpose.pl -file BPs > trans_BPs
@@ -131,7 +149,7 @@ for Inv in In055 In045 In340 In069 In266
 							cat BPs_curated output7 > output8
 							sed 's/ #CHROM/#CHROM/g' output8 | sed 's/\t\s/\t/g' | sed 's/\t1\t\n/\n/g' | sed 's/\tIDf-I\t\n/\n/g' > ./${Inv}/VCFhap/${population}/${Inv}.${population}.phased.${output}.vcf
 						
-						rm complete_list ./${Inv}/VCF/${population}/output4 ./${Inv}/VCF/${population}/output5 ./${Inv}/VCF/${population}/rsoutput4 ./${Inv}/VCF/${population}/rs_info ./${Inv}/VCF/${population}/rs_info2 ./${Inv}/VCF/${population}/output ./${Inv}/VCF/${population}/output2 ./${Inv}/VCF/${population}/output3 cutted cutted2 cut_positions ./${Inv}/VCF/${population}/output6 BPs trans_BPs trans2_BPs BPs_curated output8 output7 
+						rm complete_list ./${Inv}/VCF/${population}/output4 ./${Inv}/VCF/${population}/output5 ./${Inv}/VCF/${population}/rsoutput4 ./${Inv}/VCF/${population}/rs_info ./${Inv}/VCF/${population}/rs_info2 ./${Inv}/VCF/${population}/output ./${Inv}/VCF/${population}/output2 ./${Inv}/VCF/${population}/output3 cutted cutted2 cut_positions ./${Inv}/VCF/${population}/output6 BPs trans_BPs trans2_BPs BPs_curated output8 output7
 
 
 					done
