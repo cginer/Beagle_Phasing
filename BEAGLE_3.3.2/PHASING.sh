@@ -6,21 +6,34 @@ usage()
 cat << EOF
 usage: $0 options
 
-This script phases inversions with Beagle 3.2.2.
+This script phases inversions with Beagle 3.3.2.
 
 OPTIONS:
    -h      Show this message
    -i      List of inversions to phase e.g. "HsInv0045 HsInv0055 HsInv0063"
-   -p      Skip PRECOMPUTED files creation
+   -p      Skip all PRECOMPUTED files creation
    -b      Skip BEAGLE binary link creation
+   -l      Skip list of 1000G populaton download
+   -v      Skip vcf of 1000G download
+
+EXAMPLES:
+   1. To run everything from the scratch
+           PHASING.sh -i "HsInv0045 HsInv0072"
+   2. To run a new inversion
+           PHASING.sh -i "HsInv1234" -bl
+   3. To run an inversion with new genotypes
+           PHASING.sh -i "HsInv0072" -blv
+
 EOF
 }
 
 INVERSIONS=""
 CREATEPREFILES=1
 LINKBEAGLE=1
+LISTS=1
+DOWNLOADVCF=1
 
-while getopts hi:pb OPTION; do
+while getopts hi:pblv OPTION; do
      case $OPTION in
          h)
              usage
@@ -35,7 +48,12 @@ while getopts hi:pb OPTION; do
          b)
              LINKBEAGLE=0
              ;;
-
+         l)
+             LISTS=0
+             ;;
+         v)
+             DOWNLOADVCF=0
+             ;;
          ?)
              usage
              exit
@@ -56,13 +74,18 @@ fi
 
 
 # Create INPUT #####################################################################################################
-if [ "$CREATEPREFILES" == 1 ]; then
-    INPUTDIR="PRECOMPUTED"
-    ANNOTFILE="/home/shareddata/Bioinformatics/InversionAnnotation/v3LiftOver/hg19_positions.txt"
-    GENOFILE="/home/shareddata/Experimental_data/InversionGenotypes/InvGenotypes_v4.4_45invs_complete_20150923.txt"
+INPUTDIR="PRECOMPUTED"
+ANNOTFILE="/home/shareddata/Bioinformatics/InversionAnnotation/v3LiftOver/hg19_positions.txt"
+GENOFILE="/home/shareddata/Experimental_data/InversionGenotypes/InvGenotypes_v4.4_45invs_complete_20150923.txt"
 
-    # POPs_LIST from KGP Ph1 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+if [[ $CREATEPREFILES && $LISTS ]]; then
+    mkdir -p $INPUTDIR
+fi
+
+# POPs_LIST from KGP Ph1 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+if [[ "$LISTS" ==1 ]]; then
+
     mkdir -p ${INPUTDIR}/POPs_LIST
     wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20110521/phase1_integrated_calls.20101123.ALL.panel
 
@@ -76,38 +99,49 @@ if [ "$CREATEPREFILES" == 1 ]; then
     echo -e "#CHROM  POS     ID      REF     ALT     QUAL    FILTER  INFO    FORMAT  
 SUBSTCHR       X       BP1     S       I       100     PASS    AA=.;AC=;AF=;AFR_AF=;AMR_AF=;AN=;ASN_AF=;AVGPOST=;ERATE=;EUR_AF=;LDAF=;RSQ=;SNPSOURCE=;THETA=;VT=SNP    GT:DS:GL        
 SUBSTCHR       X       BP2     S       I       100     PASS    AA=.;AC=;AF=;AFR_AF=;AMR_AF=;AN=;ASN_AF=;AVGPOST=;ERATE=;EUR_AF=;LDAF=;RSQ=;SNPSOURCE=;THETA=;VT=SNP    GT:DS:GL" >${INPUTDIR}/POPs_LIST/template
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fi
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-    # VCFs_and_BPs from InvFEST data and KGP Ph1
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# VCFs_and_BPs from InvFEST data and KGP Ph1
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+if [[ "$CREATEPREFILES" == 1 ]]; then
     for Inv in ${INVERSIONS}; do
         mkdir -p ${INPUTDIR}/VCFs_and_BPs/${Inv}
         
         # inner BP positions BP1END..BP2START
+       	echo "Creating BP.positions file for $Inv"
         BP1=(`cat $ANNOTFILE | grep $Inv | grep "BP1" | cut -f-3`)
         BP2=(`cat $ANNOTFILE | grep $Inv | grep "BP2" | cut -f-3`)
         echo -e "${BP1[0]}-${BP1[2]}-${BP2[1]}" >${INPUTDIR}/VCFs_and_BPs/${Inv}/BP.positions
-
+        
         # VCF download (BP1START-2000000..BP2END+2000000)
-        CHR=`echo ${BP1[0]} | sed "s/chr//"` 
-        START=$((${BP1[1]}-2000000))
-        END=$((${BP2[2]}+2000000))
-        # echo -e "${CHR}-${START}-${END}"
-        tabix -hf ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20110521/ALL.chr${CHR}.phase1_release_v3.20101123.snps_indels_svs.genotypes.vcf.gz ${CHR}:${START}-${END} >${INPUTDIR}/VCFs_and_BPs/${Inv}/ALLPOPSALLREGION.vcf
+        if [[ "$DOWNLOADVCF" == 1 ]]; then
+            echo "Downloading 1000GP Ph1 SNPs for $Inv"
+	        CHR=`echo ${BP1[0]} | sed "s/chr//"` 
+            START=$((${BP1[1]}-2000000))
+            END=$((${BP2[2]}+2000000))
+            tabix -hf ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20110521/ALL.chr${CHR}.phase1_release_v3.20101123.snps_indels_svs.genotypes.vcf.gz ${CHR}:${START}-${END} >${INPUTDIR}/VCFs_and_BPs/${Inv}/ALLPOPSALLREGION.vcf
+        fi
 
         # Individual genotypes
+        echo "Creating Genotypes file for $Inv"
         COL=`cat $GENOFILE | head -2 | tail -1 | tr "\t" "\n" | grep -n $Inv | sed "s/:$Inv//"`
-        cat $GENOFILE | tail -n+3 | cut -f1,3,$COL | awk -v OFS='\t' '{print $2,$1,$3;}' | sed "s/\tINV/\tII/" | sed "s/\tSTD/\tSS/" | sed "s/\tHET/\tSI/" | grep -vP "\tNA$" | grep -vP "\tND$" >${INPUTDIR}/VCFs_and_BPs/${Inv}/HapMap.Genotyped.List
+        if [[ "$CHR" == "X" ]]; then
+            echo "$Inv is in chrX, males have one allele"
+            cat $GENOFILE | tail -n+3 | cut -f1,3,5,$COL | awk -v OFS='\t' '{print $2,$1,$3,$4;}' | sed "s/\tFemale\tINV/\tII/" | sed "s/\tFemale\tSTD/\tSS/" | sed "s/\tFemale\tHET/\tSI/" | grep -vP "\tNA$" | grep -vP "\tND$" | sed "s/\tMale\tINV/\tI-/" | sed "s/\tMale\tSTD/\tS-/" >${INPUTDIR}/VCFs_and_BPs/${Inv}/HapMap.Genotyped.List
+        else
+            cat $GENOFILE | tail -n+3 | cut -f1,3,$COL | awk -v OFS='\t' '{print $2,$1,$3;}' | sed "s/\tINV/\tII/" | sed "s/\tSTD/\tSS/" | sed "s/\tHET/\tSI/" | grep -vP "\tNA$" | grep -vP "\tND$" >${INPUTDIR}/VCFs_and_BPs/${Inv}/HapMap.Genotyped.List
+        fi    	    
     done
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 fi
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ####################################################################################################################
 
 
 
 # Link BEAGLE binary ###############################################################################################
-if [ "$LINKBEAGLE" == 1 ]; then
+if [[ "$LINKBEAGLE" == 1 && ! -f beagle.jar ]]; then
     ln -s /home/cginer/dcastellano_shared/Phased.Inversions/beagle.jar beagle.jar
 fi
 ####################################################################################################################
@@ -176,7 +210,7 @@ for Inv in ${INVERSIONS}; do
                 grep CHROM ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.VCF.List > ./${Inv}/VCF/${population}/head # header
                 cat ./${Inv}/VCF/${population}/${population}.vcf ./${Inv}/VCF/${population}/Bottom > ./${Inv}/VCF/${population}/${population}.B.vcf
                 sed '30r Top' ./${Inv}/VCF/${population}/${population}.B.vcf > ./${Inv}/VCF/${population}/${population}.BP.vcf2
-                sed '1,29d'   ./${Inv}/VCF/${population}/${population}.BP.vcf2 > ./${Inv}/VCF/${population}/${population}.BP.vcf3 
+                grep -v "##"  ./${Inv}/VCF/${population}/${population}.BP.vcf2 > ./${Inv}/VCF/${population}/${population}.BP.vcf3 # delete header "##"
                 sed '1,1d'    ./${Inv}/VCF/${population}/${population}.BP.vcf3 > ./${Inv}/VCF/${population}/${population}.BP.vcf4 
                 sort -k2,2n ./${Inv}/VCF/${population}/${population}.BP.vcf4 > ./${Inv}/VCF/${population}/${population}.BP.vcf5
                 cat ./${Inv}/VCF/${population}/head ./${Inv}/VCF/${population}/${population}.BP.vcf5 > ./${Inv}/VCF/${population}/${population}.BP.vcf
@@ -186,10 +220,14 @@ for Inv in ${INVERSIONS}; do
 
         echo Creating Beagle Input for In = ${Inv} and POP = ${population}
         ## En este paso cambio de formato, de VCF a input del Beagle. 
-            
-            perl $VCFtoBEAGLE_SCRIPT -vcf ./${Inv}/VCF/${population}/${population}.BP.vcf > ${population}.beagle.temp
-            sed 's/ //g' ${population}.beagle.temp | sed '/^$/d' | sed 's/ID/marker/g' | sed 's/REF/alleleA/g' | sed 's/ALT/alleleB/g' | sed 's/\t1.0000\t1.0000\t1.0000//g' > ./${Inv}/BEAGLE/INPUT/${population}.beagle.inp
-        
+            if [[ "$INV_CHRM" == "X" ]]; then
+                perl $VCFtoBEAGLE_SCRIPT -vcf ./${Inv}/VCF/${population}/${population}.BP.vcf -gender ./${Inv}/LISTS/${population}/${population}.BP.ALLPOP.list > ${population}.beagle.temp
+			    sed 's/ //g' ${population}.beagle.temp | sed '/^$/d' > ./${Inv}/BEAGLE/INPUT/${population}.beagle.inp
+
+            else
+                perl $VCFtoBEAGLE_SCRIPT -vcf ./${Inv}/VCF/${population}/${population}.BP.vcf > ${population}.beagle.temp
+                sed 's/ //g' ${population}.beagle.temp | sed '/^$/d' | sed 's/ID/marker/g' | sed 's/REF/alleleA/g' | sed 's/ALT/alleleB/g' | sed 's/\t1.0000\t1.0000\t1.0000//g' > ./${Inv}/BEAGLE/INPUT/${population}.beagle.inp
+            fi
         rm ${population}.beagle.temp #delete temporary files
 
 
