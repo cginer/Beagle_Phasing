@@ -17,11 +17,11 @@ OPTIONS:
    -v      Skip vcf of 1000G download
 
 EXAMPLES:
-   1. To run everything from the scratch
+   1. To phase everything from the scratch
            PHASING.sh -i "HsInv0045 HsInv0072"
-   2. To run a new inversion
+   2. To phase a new inversion
            PHASING.sh -i "HsInv1234" -bl
-   3. To run an inversion with new genotypes
+   3. To re-phase an inversion with new genotypes
            PHASING.sh -i "HsInv0072" -blv
 
 EOF
@@ -84,7 +84,7 @@ fi
 
 # POPs_LIST from KGP Ph1 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-if [[ "$LISTS" ==1 ]]; then
+if [[ "$LISTS" == 1 ]]; then
 
     mkdir -p ${INPUTDIR}/POPs_LIST
     wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20110521/phase1_integrated_calls.20101123.ALL.panel
@@ -199,23 +199,17 @@ for Inv in ${INVERSIONS}; do
     
         echo Adding BP genotypes for In = ${Inv} and POP = ${population}
         ## Este es el paso dondo incorporo los BPs de las inversiones como si fuesen dos SNPs mas a los VCFs de cada poblacion (generados en el paso anterior). La dificultad es incorporar los BPs en el orden que les toca.
-
+            ## File Format Preparation
+            # BP positions
             perl AddBPs.pl -BPs_file ./${Inv}/LISTS/${population}/${population}.BP.ALLPOP.list > ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed1.List
-            
-                ## File Format Preparation
-                sed 's/ //g' ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed1.List | sed 's/ID/POS/g' > ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed.List
-                paste <(cat ./PRECOMPUTED/POPs_LIST/template | sed "s/SUBSTCHR/${INV_CHRM}/g") ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed.List | sed 's/\t\t/\t/g' | awk '{temp = $2; $2 = $10; $10 = temp; print}' | sed 's/ /    /g' | awk '{for (i=1; i<=NF; i++) if (i<10 || i>10) printf $i "    "; print""}' | tr -s " " | tr " " "\t"> ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.VCF.List
-                sed '1,2d' ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.VCF.List > ./${Inv}/VCF/${population}/Bottom # BP2
-                sed '3d'   ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.VCF.List | sed '1d' > Top # BP1
-                grep CHROM ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.VCF.List > ./${Inv}/VCF/${population}/head # header
-                cat ./${Inv}/VCF/${population}/${population}.vcf ./${Inv}/VCF/${population}/Bottom > ./${Inv}/VCF/${population}/${population}.B.vcf
-                sed '30r Top' ./${Inv}/VCF/${population}/${population}.B.vcf > ./${Inv}/VCF/${population}/${population}.BP.vcf2
-                grep -v "##"  ./${Inv}/VCF/${population}/${population}.BP.vcf2 > ./${Inv}/VCF/${population}/${population}.BP.vcf3 # delete header "##"
-                sed '1,1d'    ./${Inv}/VCF/${population}/${population}.BP.vcf3 > ./${Inv}/VCF/${population}/${population}.BP.vcf4 
-                sort -k2,2n ./${Inv}/VCF/${population}/${population}.BP.vcf4 > ./${Inv}/VCF/${population}/${population}.BP.vcf5
-                cat ./${Inv}/VCF/${population}/head ./${Inv}/VCF/${population}/${population}.BP.vcf5 > ./${Inv}/VCF/${population}/${population}.BP.vcf
+            sed 's/ //g' ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed1.List | sed 's/ID/POS/g' > ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed.List
+            paste <(cat ./PRECOMPUTED/POPs_LIST/template | sed "s/SUBSTCHR/${INV_CHRM}/g") ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed.List | sed 's/\t\t/\t/g' | awk '{temp = $2; $2 = $10; $10 = temp; print}' | sed 's/ /    /g' | awk '{for (i=1; i<=NF; i++) if (i<10 || i>10) printf $i "    "; print""}' | tr -s " " | tr " " "\t"> ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.VCF.List # Create complete rows for BPs
+            # Merge with POP.vcf (without header)
+            grep -v "##" ${Inv}/VCF/${population}/${population}.vcf > ${Inv}/VCF/${population}/${population}.vcf_temp # delete header "##"
+            grep -v "#" ${Inv}/VCF/${population}/${population}.BP.ALLPOP.VCF.List >> ${Inv}/VCF/${population}/${population}.vcf_temp ## Add BPs at the end
+            sort -k2,2n ${Inv}/VCF/${population}/${population}.vcf_temp > ${Inv}/VCF/${population}/${population}.BP.vcf # sort positions
 
-            rm ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed1.List ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed.List Top ./${Inv}/VCF/${population}/Bottom ./${Inv}/VCF/${population}/${population}.B.vcf ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.VCF.List ./${Inv}/VCF/${population}/${population}.BP.vcf2 ./${Inv}/VCF/${population}/${population}.BP.vcf3 ./${Inv}/VCF/${population}/head ./${Inv}/VCF/${population}/${population}.BP.vcf4 ./${Inv}/VCF/${population}/${population}.BP.vcf5 #delete temporary files
+            rm ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed1.List ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed.List ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.VCF.List ${Inv}/VCF/${population}/${population}.vcf_temp #delete temporary files
 
 
         echo Creating Beagle Input for In = ${Inv} and POP = ${population}
@@ -247,7 +241,7 @@ for Inv in ${INVERSIONS}; do
 
             echo Switch Error Analysis for ${Inv} - ${population} and ${output}
 
-                gunzip ./${Inv}/BEAGLE/OUTPUT/${output}.${population}.beagle.inp.phased.gz 
+                gunzip -f ./${Inv}/BEAGLE/OUTPUT/${output}.${population}.beagle.inp.phased.gz 
                 grep BP ./${Inv}/BEAGLE/OUTPUT/${output}.${population}.beagle.inp.phased > BP.temp
                 grep id ./${Inv}/BEAGLE/OUTPUT/${output}.${population}.beagle.inp.phased > id.temp
                 cat id.temp BP.temp > ./${Inv}/SE/${Inv}.${population}.BP.${output}
@@ -273,10 +267,8 @@ for Inv in ${INVERSIONS}; do
                 perl SplitVCF2.pl -BPs ./${Inv}/SE/transposed_${Inv}.${population}.BP.${output} -Genotyped ./PRECOMPUTED/VCFs_and_BPs/${Inv}/HapMap.Genotyped.List > cutted #busca el num de columna especifico del vcf original para la lista dada de individuos
                 sed -e 's/\s\+//g' cutted > cutted2
                 sed 's/,$//' cutted2 > cut_positions
-
-                for cut_positions in `less cut_positions`; do
-                     cut -f1-9,${cut_positions} ./${Inv}/VCF/${population}/output3 > ./${Inv}/VCF/${population}/output4 #corta las columnas con la informacion de las 9 primeras columnas del vcf + las especificas de los invertidos
-                done
+                cut_positions=`less cut_positions` 
+                cut -f1-9,${cut_positions} ./${Inv}/VCF/${population}/output3 > ./${Inv}/VCF/${population}/output4 #corta las columnas con la informacion de las 9 primeras columnas del vcf + las especificas de los invertidos
                 
                 awk '{print $3}' ./${Inv}/VCF/${population}/output4 > ./${Inv}/VCF/${population}/rsoutput4                    
                 paste ./${Inv}/VCF/${population}/output4 ./${Inv}/VCF/${population}/rsoutput4    > ./${Inv}/VCF/${population}/output5                        
