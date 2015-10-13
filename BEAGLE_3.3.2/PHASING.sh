@@ -142,7 +142,7 @@ fi
 
 # Link BEAGLE binary ###############################################################################################
 if [[ "$LINKBEAGLE" == 1 && ! -f beagle.jar ]]; then
-    ln -s /home/cginer/dcastellano_shared/Phased.Inversions/beagle.jar beagle.jar
+    ln -s /home/dcastellano/shared/Phased.Inversions/beagle.jar beagle.jar
 fi
 ####################################################################################################################
 
