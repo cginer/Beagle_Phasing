@@ -208,7 +208,7 @@ for Inv in ${INVERSIONS}; do
             grep -v "##" ${Inv}/VCF/${population}/${population}.vcf > ${Inv}/VCF/${population}/${population}.vcf_temp # delete header "##"
             grep -v "#" ${Inv}/VCF/${population}/${population}.BP.ALLPOP.VCF.List >> ${Inv}/VCF/${population}/${population}.vcf_temp ## Add BPs at the end
             sort -k2,2n ${Inv}/VCF/${population}/${population}.vcf_temp > ${Inv}/VCF/${population}/${population}.BP.vcf # sort positions
-
+	    header="$(grep '##' ${Inv}/VCF/${population}/${population}.vcf)" 
             rm ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed1.List ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed.List ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.VCF.List ${Inv}/VCF/${population}/${population}.vcf_temp #delete temporary files
 
 
