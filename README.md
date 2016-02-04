@@ -9,7 +9,7 @@ git clone https://github.com/cginer/Beagle_Phasing.git
 Run the script by typing
 
 ```
-cd Beagle_Phasing/Beagle3.3.2/
+cd Beagle_Phasing/Beagle_3.3.2/
 bash PHASING.sh -i "HsInv0001"
 ```
 
