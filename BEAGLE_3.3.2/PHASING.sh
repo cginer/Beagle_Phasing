@@ -288,6 +288,10 @@ for Inv in ${INVERSIONS}; do
             
             rm complete_list ./${Inv}/VCF/${population}/output4 ./${Inv}/VCF/${population}/output5 ./${Inv}/VCF/${population}/rsoutput4 ./${Inv}/VCF/${population}/rs_info ./${Inv}/VCF/${population}/rs_info2 ./${Inv}/VCF/${population}/output ./${Inv}/VCF/${population}/output2 ./${Inv}/VCF/${population}/output3 cutted cutted2 cut_positions ./${Inv}/VCF/${population}/output6 BPs trans_BPs trans2_BPs BPs_curated output8 output7
         done
+        #Reprint meta information header
+        printf "$header\n$(cat ${Inv}/VCFhap/${population}/${Inv}.${population}.phased.output2.vcf)" > ${Inv}/VCFhap/${population}/${Inv}.${population}.phased.output2.vcf
+        printf "$header\n$(cat ${Inv}/VCFhap/${population}/${Inv}.${population}.phased.output1.vcf)" > ${Inv}/VCFhap/${population}/${Inv}.${population}.phased.output1.vcf
+        printf "$header\n$(cat ${Inv}/VCF/${population}/${population}.BP.vcf)" > ${Inv}/VCF/${population}/${population}.BP.vcf
     done
 done
 ####################################################################################################################
