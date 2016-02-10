@@ -208,7 +208,9 @@ for Inv in ${INVERSIONS}; do
             grep -v "##" ${Inv}/VCF/${population}/${population}.vcf > ${Inv}/VCF/${population}/${population}.vcf_temp # delete header "##"
             grep -v "#" ${Inv}/VCF/${population}/${population}.BP.ALLPOP.VCF.List >> ${Inv}/VCF/${population}/${population}.vcf_temp ## Add BPs at the end
             sort -k2,2n ${Inv}/VCF/${population}/${population}.vcf_temp > ${Inv}/VCF/${population}/${population}.BP.vcf # sort positions
-	    header="$(grep '##' ${Inv}/VCF/${population}/${population}.vcf)" 
+            headerCHRM="$(grep '#CHROM' ${Inv}/VCF/${population}/${population}.vcf)" 
+            header="$(grep '##' ${Inv}/VCF/${population}/${population}.vcf)" 
+
             rm ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed1.List ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.transposed.List ./${Inv}/VCF/${population}/${population}.BP.ALLPOP.VCF.List ${Inv}/VCF/${population}/${population}.vcf_temp #delete temporary files
 
 
@@ -276,7 +278,7 @@ for Inv in ${INVERSIONS}; do
                 ## Aqui estan todos los SNPs, sepamos o no el estado ancestral.
                 
                 perl $VCFHap_SCRIPT -file ./${Inv}/VCF/${population}/output5 | sed '/^$/d' | sed 's/\t\s/\t/g' | sed 's/\t\s/\t/g' > ./${Inv}/VCF/${population}/output6
-                grep 'CHROM' ./${Inv}/VCF/${population}/output6 >  BPs
+                grep '##' ./${Inv}/VCF/${population}/output6 >  BPs
                 grep 'BP'    ./${Inv}/VCF/${population}/output6 >> BPs
                 perl Transpose.pl -file BPs > trans_BPs
                 awk '{print $1}' trans_BPs | head -n 9 > trans2_BPs
@@ -286,9 +288,12 @@ for Inv in ${INVERSIONS}; do
                 cat BPs_curated output7 > output8
                 sed 's/ #CHROM/#CHROM/g' output8 | sed 's/\t\s/\t/g' | sed 's/\t1\t\n/\n/g' | sed 's/\tIDf-I\t\n/\n/g' > ./${Inv}/VCFhap/${population}/${Inv}.${population}.phased.${output}.vcf
             
-            rm complete_list ./${Inv}/VCF/${population}/output4 ./${Inv}/VCF/${population}/output5 ./${Inv}/VCF/${population}/rsoutput4 ./${Inv}/VCF/${population}/rs_info ./${Inv}/VCF/${population}/rs_info2 ./${Inv}/VCF/${population}/output ./${Inv}/VCF/${population}/output2 ./${Inv}/VCF/${population}/output3 cutted cutted2 cut_positions ./${Inv}/VCF/${population}/output6 BPs trans_BPs trans2_BPs BPs_curated output8 output7
+            rm complete_list ./${Inv}/VCF/${population}/output4 ./${Inv}/VCF/${population}/output5 ./${Inv}/VCF/${population}/rsoutput4 ./${Inv}/VCF/${population}/rs_info ./${Inv}/VCF/${population}/rs_info2 ./${Inv}/VCF/${population}/output ./${Inv}/VCF/${population}/output2 ./${Inv}/VCF/${population}/output3 cutted cutted2 cut_positions ./${Inv}/VCF/${population}/output6 BPs trans_BPs trans2_BPs BPs_curated output8 output7 
+            
         done
         #Reprint meta information header
+        printf "$headerCHRM\n$(cat ${Inv}/VCFhap/${population}/${Inv}.${population}.phased.output1.vcf)" > ${Inv}/VCFhap/${population}/${Inv}.${population}.phased.output1.vcf
+        printf "$headerCHRM\n$(cat ${Inv}/VCFhap/${population}/${Inv}.${population}.phased.output2.vcf)" > ${Inv}/VCFhap/${population}/${Inv}.${population}.phased.output2.vcf
         printf "$header\n$(cat ${Inv}/VCFhap/${population}/${Inv}.${population}.phased.output2.vcf)" > ${Inv}/VCFhap/${population}/${Inv}.${population}.phased.output2.vcf
         printf "$header\n$(cat ${Inv}/VCFhap/${population}/${Inv}.${population}.phased.output1.vcf)" > ${Inv}/VCFhap/${population}/${Inv}.${population}.phased.output1.vcf
         printf "$header\n$(cat ${Inv}/VCF/${population}/${population}.BP.vcf)" > ${Inv}/VCF/${population}/${population}.BP.vcf
